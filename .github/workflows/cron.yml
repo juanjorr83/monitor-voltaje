@@ -39,6 +39,6 @@ jobs:
           TUYA_REGION: ${{ secrets.TUYA_REGION }}
         run: |
           for i in 1 2 3 4 5; do
-            python scripts/script_tuya.py || true
+            python script_tuya.py || true
             if [ "$i" -lt 5 ]; then sleep 60; fi
           done
