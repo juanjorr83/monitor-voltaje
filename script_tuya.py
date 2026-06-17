@@ -1,4 +1,4 @@
-﻿"""
+"""
 script_tuya.py
 ---------------
 Lee el voltaje actual de un dispositivo Tuya (enchufe inteligente, medidor, etc.)
@@ -7,12 +7,12 @@ y lo inserta en la tabla `lecturas_voltaje` de Supabase.
 Pensado para ejecutarse cada minuto desde GitHub Actions (ver .github/workflows/cron.yml).
 
 Variables de entorno requeridas (configúralas como GitHub Secrets):
-  - SUPABASE_URL              URL del proyecto Supabase
-  - SUPABASE_SERVICE_ROLE_KEY Service role key (bypass RLS, sólo backend)
-  - TUYA_CLIENT_ID            Access ID de tu proyecto en iot.tuya.com
-  - TUYA_CLIENT_SECRET        Access Secret de tu proyecto en iot.tuya.com
-  - TUYA_DEVICE_ID            ID del dispositivo a consultar
-  - TUYA_REGION               (opcional) eu | us | cn | in   (por defecto: eu)
+  - SUPABASE_URL          URL del proyecto Supabase
+  - SUPABASE_PUBLISHABLE_KEY Clave pública anon (segura con políticas RLS)
+  - TUYA_CLIENT_ID        Access ID de tu proyecto en iot.tuya.com
+  - TUYA_CLIENT_SECRET    Access Secret de tu proyecto en iot.tuya.com
+  - TUYA_DEVICE_ID        ID del dispositivo a consultar
+  - TUYA_REGION           (opcional) eu | us | cn | in   (por defecto: eu)
 
 Dependencias: requests
   pip install requests
@@ -131,11 +131,11 @@ def extract_voltage(status: list[dict]) -> float:
 
 # ---------- Supabase ----------
 
-def insert_voltage(supabase_url: str, service_key: str, voltaje: float) -> None:
+def insert_voltage(supabase_url: str, anon_key: str, voltaje: float) -> None:
     url = f"{supabase_url.rstrip('/')}/rest/v1/lecturas_voltaje"
     headers = {
-        "apikey": service_key,
-        "Authorization": f"Bearer {service_key}",
+        "apikey": anon_key,
+        "Authorization": f"Bearer {anon_key}",
         "Content-Type": "application/json",
         "Prefer": "return=minimal",
     }
@@ -152,7 +152,7 @@ def insert_voltage(supabase_url: str, service_key: str, voltaje: float) -> None:
 
 def main() -> int:
     supabase_url = env("SUPABASE_URL")
-    service_key = env("SUPABASE_SERVICE_ROLE_KEY")
+    publishable_key = env("SUPABASE_PUBLISHABLE_KEY")
     client_id = env("TUYA_CLIENT_ID")
     client_secret = env("TUYA_CLIENT_SECRET")
     device_id = env("TUYA_DEVICE_ID")
@@ -167,13 +167,12 @@ def main() -> int:
         token = get_access_token(base_url, client_id, client_secret)
         status = get_device_status(base_url, client_id, client_secret, token, device_id)
         voltage = extract_voltage(status)
-        insert_voltage(supabase_url, service_key, voltage)
+        insert_voltage(supabase_url, publishable_key, voltage)
         print(f"[OK] {datetime.now().isoformat(timespec='seconds')}  voltaje={voltage} V")
         return 0
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
