@@ -1,0 +1,44 @@
+name: Tuya → Supabase (voltaje cada minuto)
+
+# GitHub Actions ejecuta los cron con granularidad mínima de 5 minutos
+# y además puede retrasarse en horas punta. Para acercarnos a 1 muestra/min
+# disparamos el workflow cada 5 minutos y dentro hacemos 5 lecturas separadas
+# por 60 segundos.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: tuya-voltage
+  cancel-in-progress: false
+
+jobs:
+  read-voltage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install --no-cache-dir requests
+
+      - name: Read & push voltage (5 muestras, 1/min)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TUYA_CLIENT_ID: ${{ secrets.TUYA_CLIENT_ID }}
+          TUYA_CLIENT_SECRET: ${{ secrets.TUYA_CLIENT_SECRET }}
+          TUYA_DEVICE_ID: ${{ secrets.TUYA_DEVICE_ID }}
+          TUYA_REGION: ${{ secrets.TUYA_REGION }}
+        run: |
+          for i in 1 2 3 4 5; do
+            python scripts/script_tuya.py || true
+            if [ "$i" -lt 5 ]; then sleep 60; fi
+          done
