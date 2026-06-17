@@ -32,7 +32,7 @@ jobs:
       - name: Read & push voltage (5 muestras, 1/min)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           TUYA_CLIENT_ID: ${{ secrets.TUYA_CLIENT_ID }}
           TUYA_CLIENT_SECRET: ${{ secrets.TUYA_CLIENT_SECRET }}
           TUYA_DEVICE_ID: ${{ secrets.TUYA_DEVICE_ID }}
