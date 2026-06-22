@@ -1,23 +1,3 @@
-"""
-script_tuya.py
----------------
-Lee el voltaje actual de un dispositivo Tuya (enchufe inteligente, medidor, etc.)
-y lo inserta en la tabla `lecturas_voltaje` de Supabase.
-
-Pensado para ejecutarse cada minuto desde GitHub Actions (ver .github/workflows/cron.yml).
-
-Variables de entorno requeridas (configúralas como GitHub Secrets):
-  - SUPABASE_URL          URL del proyecto Supabase
-  - SUPABASE_PUBLISHABLE_KEY Clave pública anon (segura con políticas RLS)
-  - TUYA_CLIENT_ID        Access ID de tu proyecto en iot.tuya.com
-  - TUYA_CLIENT_SECRET    Access Secret de tu proyecto en iot.tuya.com
-  - TUYA_DEVICE_ID        ID del dispositivo a consultar
-  - TUYA_REGION           (opcional) eu | us | cn | in   (por defecto: eu)
-
-Dependencias: requests
-  pip install requests
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -39,10 +19,7 @@ TUYA_ENDPOINTS = {
     "in": "https://openapi.tuyain.com",
 }
 
-# Códigos típicos que reporta Tuya para voltaje (varía según dispositivo).
-# El script prueba en este orden y usa el primero que encuentre.
 VOLTAGE_CODES = ("cur_voltage", "voltage", "voltage_a", "phase_a")
-# Factor de escala (Tuya suele devolver decivoltios: 2300 = 230.0 V)
 VOLTAGE_SCALE = 10.0
 
 
@@ -120,22 +97,18 @@ def extract_voltage(status: list[dict]) -> float:
                 value = float(raw) / VOLTAGE_SCALE
             except (TypeError, ValueError):
                 continue
-            # Sanity check: red doméstica europea ~ 180..270 V
             if 50 <= value <= 500:
                 return round(value, 2)
     raise RuntimeError(
-        f"No se encontró voltaje en el status del dispositivo. "
-        f"Códigos disponibles: {list(by_code.keys())}"
+        f"No se encontró voltaje en el status del dispositivo. Códigos: {list(by_code.keys())}"
     )
 
 
-# ---------- Supabase ----------
-
-def insert_voltage(supabase_url: str, anon_key: str, voltaje: float) -> None:
+def insert_voltage(supabase_url: str, publishable_key: str, voltaje: float) -> None:
     url = f"{supabase_url.rstrip('/')}/rest/v1/lecturas_voltaje"
     headers = {
-        "apikey": anon_key,
-        "Authorization": f"Bearer {anon_key}",
+        "apikey": publishable_key,
+        "Authorization": f"Bearer {publishable_key}",
         "Content-Type": "application/json",
         "Prefer": "return=minimal",
     }
@@ -148,7 +121,7 @@ def insert_voltage(supabase_url: str, anon_key: str, voltaje: float) -> None:
         raise RuntimeError(f"Supabase insert error {r.status_code}: {r.text}")
 
 
-# ---------- Main ----------
+# ---------- Main (Bucle continuo de 1 hora) ----------
 
 def main() -> int:
     supabase_url = env("SUPABASE_URL")
@@ -163,16 +136,23 @@ def main() -> int:
         print(f"[ERROR] Región Tuya desconocida: {region}", file=sys.stderr)
         return 1
 
-    try:
-        token = get_access_token(base_url, client_id, client_secret)
-        status = get_device_status(base_url, client_id, client_secret, token, device_id)
-        voltage = extract_voltage(status)
-        insert_voltage(supabase_url, publishable_key, voltage)
-        print(f"[OK] {datetime.now().isoformat(timespec='seconds')}  voltaje={voltage} V")
-        return 0
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        return 1
+    print("[START] Iniciando bucle continuo de monitorización (1 hora)...")
+    for ciclo in range(12):
+        try:
+            token = get_access_token(base_url, client_id, client_secret)
+            status = get_device_status(base_url, client_id, client_secret, token, device_id)
+            voltage = extract_voltage(status)
+            insert_voltage(supabase_url, publishable_key, voltage)
+            print(f"[OK] Ciclo {ciclo+1}/12 - {datetime.now().isoformat(timespec='seconds')} -> voltaje={voltage} V")
+        except Exception as e:
+            print(f"[ERROR en ciclo {ciclo+1}] {e}", file=sys.stderr)
+        
+        if ciclo < 11:
+            time.sleep(300)
+            
+    print("[END] Bucle de 1 hora completado con éxito.")
+    return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
