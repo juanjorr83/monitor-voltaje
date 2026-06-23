@@ -1,10 +1,9 @@
-name: Tuya → Supabase (voltaje cada 5 minutos)
+name: Tuya → Supabase (voltaje cada 10 minutos)
 
-# El script se ejecuta cada 3 horas y se queda abierto durante 1 hora completa,
-# tomando una lectura real de voltaje cada 5 minutos (12 ciclos en total).
+# Se dispara de forma automática cada 10 minutos clavados las 24h
 on:
   schedule:
-    - cron: "0 */3 * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 concurrency:
@@ -14,7 +13,7 @@ concurrency:
 jobs:
   read-voltage:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: pip install --no-cache-dir requests
 
-      - name: Read & push voltage (Bucle largo de 1 hora)
+      - name: Read & push voltage (Una única lectura rápida)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
