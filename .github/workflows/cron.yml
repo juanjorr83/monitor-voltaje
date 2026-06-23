@@ -1,10 +1,9 @@
 name: Tuya → Supabase (voltaje cada 10 minutos)
 
-# Se dispara de forma automática cada 10 minutos clavados las 24h
 on:
   schedule:
-    - cron: "*/10 * * * *"
-  workflow_dispatch: {}
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 concurrency:
   group: tuya-voltage
@@ -34,5 +33,4 @@ jobs:
           TUYA_CLIENT_SECRET: ${{ secrets.TUYA_CLIENT_SECRET }}
           TUYA_DEVICE_ID: ${{ secrets.TUYA_DEVICE_ID }}
           TUYA_REGION: ${{ secrets.TUYA_REGION }}
-        run: |
-          python script_tuya.py
+        run: python script_tuya.py
