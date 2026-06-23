@@ -121,7 +121,7 @@ def insert_voltage(supabase_url: str, publishable_key: str, voltaje: float) -> N
         raise RuntimeError(f"Supabase insert error {r.status_code}: {r.text}")
 
 
-# ---------- Main (Bucle continuo de 1 hora) ----------
+# ---------- Main (Lectura única instantánea) ----------
 
 def main() -> int:
     supabase_url = env("SUPABASE_URL")
@@ -136,22 +136,16 @@ def main() -> int:
         print(f"[ERROR] Región Tuya desconocida: {region}", file=sys.stderr)
         return 1
 
-    print("[START] Iniciando bucle continuo de monitorización (1 hora)...")
-    for ciclo in range(12):
-        try:
-            token = get_access_token(base_url, client_id, client_secret)
-            status = get_device_status(base_url, client_id, client_secret, token, device_id)
-            voltage = extract_voltage(status)
-            insert_voltage(supabase_url, publishable_key, voltage)
-            print(f"[OK] Ciclo {ciclo+1}/12 - {datetime.now().isoformat(timespec='seconds')} -> voltaje={voltage} V")
-        except Exception as e:
-            print(f"[ERROR en ciclo {ciclo+1}] {e}", file=sys.stderr)
-        
-        if ciclo < 11:
-            time.sleep(300)
-            
-    print("[END] Bucle de 1 hora completado con éxito.")
-    return 0
+    try:
+        token = get_access_token(base_url, client_id, client_secret)
+        status = get_device_status(base_url, client_id, client_secret, token, device_id)
+        voltage = extract_voltage(status)
+        insert_voltage(supabase_url, publishable_key, voltage)
+        print(f"[OK] {datetime.now().isoformat(timespec='seconds')} -> voltaje={voltage} V")
+        return 0
+    except Exception as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
