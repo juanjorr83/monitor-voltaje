@@ -121,7 +121,7 @@ def insert_voltage(supabase_url: str, publishable_key: str, voltaje: float) -> N
         raise RuntimeError(f"Supabase insert error {r.status_code}: {r.text}")
 
 
-# ---------- Main (Lectura única instantánea) ----------
+# ---------- Main con Sistema de Reintentos Automáticos ----------
 
 def main() -> int:
     supabase_url = env("SUPABASE_URL")
@@ -136,16 +136,26 @@ def main() -> int:
         print(f"[ERROR] Región Tuya desconocida: {region}", file=sys.stderr)
         return 1
 
-    try:
-        token = get_access_token(base_url, client_id, client_secret)
-        status = get_device_status(base_url, client_id, client_secret, token, device_id)
-        voltage = extract_voltage(status)
-        insert_voltage(supabase_url, publishable_key, voltage)
-        print(f"[OK] {datetime.now().isoformat(timespec='seconds')} -> voltaje={voltage} V")
-        return 0
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        return 1
+    intentos_maximos = 4
+    tiempo_espera = 15  # segundos entre intentos
+
+    for intento in range(1, intentos_maximos + 1):
+        try:
+            print(f"[INFO] Intento {intento}/{intentos_maximos}...")
+            token = get_access_token(base_url, client_id, client_secret)
+            status = get_device_status(base_url, client_id, client_secret, token, device_id)
+            voltage = extract_voltage(status)
+            insert_voltage(supabase_url, publishable_key, voltage)
+            print(f"[OK] {datetime.now().isoformat(timespec='seconds')} -> voltaje={voltage} V")
+            return 0  # Éxito total, salimos del script
+        except Exception as e:
+            print(f"[ADVERTENCIA] El intento {intento} falló debido a: {e}", file=sys.stderr)
+            if intento < intentos_maximos:
+                print(f"[INFO] Esperando {tiempo_espera} segundos antes del siguiente intento...", file=sys.stderr)
+                time.sleep(tiempo_espera)
+            else:
+                print("[ERROR] Se agotaron todos los intentos de ejecución.", file=sys.stderr)
+                return 1
 
 
 if __name__ == "__main__":
